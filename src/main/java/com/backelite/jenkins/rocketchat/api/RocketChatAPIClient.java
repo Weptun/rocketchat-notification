@@ -5,7 +5,6 @@ import us.monoid.json.JSONObject;
 import us.monoid.web.Resty;
 
 import java.io.PrintStream;
-import java.net.URLEncoder;
 
 import static us.monoid.web.Resty.*;
 

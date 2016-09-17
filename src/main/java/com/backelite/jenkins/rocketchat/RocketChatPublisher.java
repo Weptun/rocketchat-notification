@@ -4,7 +4,6 @@ import com.backelite.jenkins.rocketchat.api.RocketChatAPIClient;
 import com.backelite.jenkins.rocketchat.api.RocketChatAPIException;
 import com.backelite.jenkins.rocketchat.api.RocketChatPostAttachment;
 import com.backelite.jenkins.rocketchat.api.RocketChatPostPayload;
-import com.sun.org.apache.regexp.internal.RE;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.*;

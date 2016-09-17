@@ -2,7 +2,6 @@ package com.backelite.jenkins.rocketchat;
 
 import hudson.Extension;
 import hudson.model.AbstractProject;
-import hudson.model.Descriptor;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Publisher;
 import net.sf.json.JSONObject;
