@@ -4,8 +4,7 @@ A plugin to notify Jenkins build statuses on Rocket.Chat.
 
 | Branch   |      Status                                                                                                                                |
 |----------|:------------------------------------------------------------------------------------------------------------------------------------------:|
-| master | [![Build Status](https://travis-ci.org/zippy1978/rocketchat-jenkins-plugin.svg?branch=master)](https://travis-ci.org/Backelite/sonar-swift)  |
-| develop| [![Build Status](https://travis-ci.org/zippy1978/rocketchat-jenkins-plugin.svg?branch=develop)](https://travis-ci.org/Backelite/sonar-swift) |
+| master | [![Build Status](https://travis-ci.org/rgroszewski/rocketchat-notification.svg?branch=master)](https://travis-ci.org/rgroszewski/rocketchat-notification)  |
 
 ## Setup
 
