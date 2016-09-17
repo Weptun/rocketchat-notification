@@ -4,20 +4,24 @@ import com.backelite.jenkins.rocketchat.api.RocketChatAPIClient;
 import com.backelite.jenkins.rocketchat.api.RocketChatAPIException;
 import com.backelite.jenkins.rocketchat.api.RocketChatPostAttachment;
 import com.backelite.jenkins.rocketchat.api.RocketChatPostPayload;
+import com.sun.org.apache.regexp.internal.RE;
+import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.*;
 import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Notifier;
 import hudson.tasks.test.AbstractTestResultAction;
+import jenkins.tasks.SimpleBuildStep;
 import org.kohsuke.stapler.DataBoundConstructor;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.Serializable;
 
 /**
  * Created by gillesgrousset on 07/07/2016.
  */
-public class RocketChatPublisher extends Notifier implements Serializable {
+public class RocketChatPublisher extends Notifier implements SimpleBuildStep, Serializable {
 
     private String channel;
     private boolean notifyBackToNormalOnly;
@@ -51,55 +55,53 @@ public class RocketChatPublisher extends Notifier implements Serializable {
     }
 
     @Override
-    public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
+    public void perform(@Nonnull Run<?, ?> run, @Nonnull FilePath filePath, @Nonnull Launcher launcher, @Nonnull TaskListener taskListener) throws InterruptedException, IOException {
+        taskListener.getLogger().println("Notifying Rocket.Chat");
 
-        listener.getLogger().println("Notifying Rocket.Chat");
-
-        if (shouldNotify(build)) {
+        if (shouldNotify(run)) {
 
             // Load and expand global settings
             String webhookURL = this.getDescriptor().getWebhookUrl();
 
             // API client instance
-            RocketChatAPIClient client = new RocketChatAPIClient(webhookURL, listener.getLogger());
+            RocketChatAPIClient client = new RocketChatAPIClient(webhookURL, taskListener.getLogger());
 
             // Build payload
-            RocketChatPostPayload payload = this.buildPayload(build);
+            RocketChatPostPayload payload = this.buildPayload(run);
 
 
             // Post message
             try {
                 client.post(payload);
-                return true;
+                run.setResult(Result.SUCCESS);
             } catch (RocketChatAPIException e) {
                 // Log but do not mark build as failed
-                listener.getLogger().println("Failed to notify Rocket.Chat: " + e.getMessage());
-                return false;
+                taskListener.getLogger().println("Failed to notify Rocket.Chat: " + e.getMessage());
+                run.setResult(Result.FAILURE);
             }
 
         } else {
-            return true;
+            run.setResult(Result.SUCCESS);
         }
-
     }
 
-    private boolean shouldNotify(AbstractBuild<?, ?> build) {
+    private boolean shouldNotify(Run<?, ?> run) {
 
         boolean shouldNotify = true;
-        if (build.getResult() == Result.SUCCESS) {
-            if (!isBackToNormal(build) && notifyBackToNormalOnly) {
+        if (run.getResult() == Result.SUCCESS) {
+            if (!isBackToNormal(run) && notifyBackToNormalOnly) {
                shouldNotify = false;
             }
         }
         return shouldNotify;
     }
 
-    private boolean isBackToNormal(AbstractBuild<?, ?> build) {
+    private boolean isBackToNormal(Run<?, ?> run) {
 
         boolean backToNormal = false;
-        if (build.getPreviousBuild() != null) {
-            if (build.getResult() == Result.SUCCESS &&
-                    (build.getPreviousBuild().getResult() == Result.FAILURE || build.getPreviousBuild().getResult() == Result.UNSTABLE)) {
+        if (run.getPreviousBuild() != null) {
+            if (run.getResult() == Result.SUCCESS &&
+                    (run.getPreviousBuild().getResult() == Result.FAILURE || run.getPreviousBuild().getResult() == Result.UNSTABLE)) {
                 backToNormal = true;
             }
         } else {
@@ -109,32 +111,32 @@ public class RocketChatPublisher extends Notifier implements Serializable {
         return backToNormal;
     }
 
-    private RocketChatPostPayload buildPayload(AbstractBuild<?, ?> build) {
+    private RocketChatPostPayload buildPayload(Run<?, ?> run) {
 
         RocketChatPostPayload payload = new RocketChatPostPayload();
 
 
         // Project info
-        String projectName = build.getProject().getName();
-        String buildURL = build.getProject().getAbsoluteUrl() + build.getNumber();
+        String projectName = run.getParent().getName();
+        String buildURL = run.getParent().getAbsoluteUrl() + run.getNumber();
 
 
         // Channel
         payload.setChannel(this.getChannel());
 
         // Title
-        if (isBackToNormal(build)) {
-            payload.setText(String.format(":heavy_check_mark: Job [*%s - #%d*](%s) is back to normal", projectName, build.getNumber(), buildURL));
-        } else if (build.getResult() == Result.FAILURE) {
-            payload.setText(String.format(":x: Job [*%s - #%d*](%s) failed", projectName, build.getNumber(), buildURL));
-        } else if (build.getResult() == Result.UNSTABLE) {
-            payload.setText(String.format(":x: Job [*%s - #%d*](%s) is unstable", projectName, build.getNumber(), buildURL));
+        if (isBackToNormal(run)) {
+            payload.setText(String.format(":heavy_check_mark: Job [*%s - #%d*](%s) is back to normal", projectName, run.getNumber(), buildURL));
+        } else if (run.getResult() == Result.FAILURE) {
+            payload.setText(String.format(":x: Job [*%s - #%d*](%s) failed", projectName, run.getNumber(), buildURL));
+        } else if (run.getResult() == Result.UNSTABLE) {
+            payload.setText(String.format(":x: Job [*%s - #%d*](%s) is unstable", projectName, run.getNumber(), buildURL));
         } else if (!notifyBackToNormalOnly) {
-            payload.setText(String.format(":heavy_check_mark: Job [*%s - #%d*](%s) is successful", projectName, build.getNumber(), buildURL));
+            payload.setText(String.format(":heavy_check_mark: Job [*%s - #%d*](%s) is successful", projectName, run.getNumber(), buildURL));
         }
 
         // Test results (as attachment)
-        AbstractTestResultAction<?> action = build.getAction(AbstractTestResultAction.class);
+        AbstractTestResultAction<?> action = run.getAction(AbstractTestResultAction.class);
         if (action != null) {
 
             int total = action.getTotalCount();
@@ -146,7 +148,7 @@ public class RocketChatPublisher extends Notifier implements Serializable {
             payload.getAttachments().add(testAttachment);
             // Title
             testAttachment.setTitle("Tests");
-            testAttachment.setTitleLink(build.getProject().getAbsoluteUrl() + build.getNumber() + "/testReport/");
+            testAttachment.setTitleLink(run.getParent().getAbsoluteUrl() + run.getNumber() + "/testReport/");
             // Color
             String color = "#009933";
             if (failed > 0) {
